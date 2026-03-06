@@ -1,0 +1,20 @@
+                Students
+                   │
+                   │
+            ┌──────▼──────┐
+            │Load Balancer│
+            └──────┬──────┘
+                   │
+        ┌──────────┴──────────┐
+        │                     │
+   Node Server           Node Server
+     Port 5000            Port 5001
+        │                     │
+        └──────────┬──────────┘
+                   │
+                Redis
+          (Atomic capacity)
+                   │
+                   │
+              PostgreSQL
+        (Persistent bookings)

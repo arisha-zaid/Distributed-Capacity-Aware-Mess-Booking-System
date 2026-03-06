@@ -1,0 +1,57 @@
+npm init -y
+Package	Why??
+express	API server
+pg	PostgreSQL
+redis	Atomic seat locking
+dotenv	Env variables
+bcrypt	Password hashing
+jsonwebtoken	Auth & QR token
+uuid	Unique IDs
+qrcode	Generate QR
+nodemon	Dev server
+
+setup db schema in postgresql
+
+--------REDIS-----------
+redis-cli 
+quit
+redis-cli 
+GET key
+SET name arisha  
+EXISTS key
+DEL key 
+flushall
+expire key 10   //i.e this key will expire in 10 second 
+ttl key // it will return time to live 
+setex key expiretime val
+
+//list add at front of array
+lpush friends kally
+//list add at last 
+rpush friends sally 
+//delete from friends
+LPOP friends
+RPOP friends
+//print list -----lrange key start end 
+lrange friends 0 -1
+
+//hash
+HSET person name sally
+HSET person age 26
+//----------w'll return person all pairs 
+HGETALL person
+HGET person name 
+
+
+
+-------------------CMD---------------------
+cd backend
+wsl 
+PORT=5001 node server.js
+
+
+wsl 
+sudo service postgresql start
+sudo service postgresql status
+sudo -i -u postgres 
+psql

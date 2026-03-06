@@ -1,0 +1,118 @@
+Testing 1 - Capacity Safety (No Overselling)
+in wsl terminal , replace slot id with slot of two 
+
+for i in {1..10}; do
+  curl -X POST http://localhost:5001/bookings \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"userId\": \"31b3ae17-f969-403c-84d2-3b86451a24f4\",
+    \"slotId\": \"SLOT_ID_HERE\",
+    \"idempotencyKey\": \"test-$i\"
+  }" &
+done
+[output]
+[1] 2035
+[2] 2036
+[3] 2037
+[4] 2038
+[5] 2039
+[6] 2040
+[7] 2041
+[8] 2042
+[9] 2043
+[10] 2044
+arisha@WIN-TNPIOPDFGKG:/mnt/c/Users/Administrator/OneDrive/Desktop/canteen$ {"error":"Slot Full"}{"error":"Slot Full"}{"error":"Slot Full"}{"error":"Slot Full"}{"error":"Slot Full"}{"error":"Slot Full"}{"id":"a3ca612c-7fa9-4df3-b31c-73df53516bc3","user_id":"31b3ae17-f969-403c-84d2-3b86451a24f4","slot_id":"d36a55e6-94ac-4e0c-b9e6-ea897aff0f56","status":"booked","qr_token":null,"idempotency_key":"test-1","created_at":"2026-03-05T09:44:49.151Z"}{"error":"Slot Full"}{"error":"Slot Full"}{"id":"32d2206d-5d7a-4bb4-af13-34f2832d2057","user_id":"31b3ae17-f969-403c-84d2-3b86451a24f4","slot_id":"d36a55e6-94ac-4e0c-b9e6-ea897aff0f56","status":"booked","qr_token":null,"idempotency_key":"test-5","created_at":"2026-03-05T09:44:49.150Z"}
+
+
+TEST 2 — Idempotency (Same request repeated should NOT double book.)
+curl -X POST http://localhost:5001/bookings \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId": "31b3ae17-f969-403c-84d2-3b86451a24f4",
+    "slotId": "d36a55e6-94ac-4e0c-b9e6-ea897aff0f56\",
+    "idempotencyKey": "test-$i\"
+  }'
+
+  [output]
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Error</title>
+</head>
+<body>
+<pre>SyntaxError: Unexpected token <br> in JSON at position 110<br> &nbsp; &nbsp;at JSON.parse (&lt;anonymous&gt;)<br> &nbsp; &nbsp;at parse (/mnt/c/Users/Administrator/OneDrive/Desktop/canteen/backend/node_modules/body-parser/lib/types/json.js:72:19)<br> &nbsp; &nbsp;at /mnt/c/Users/Administrator/OneDrive/Desktop/canteen/backend/node_modules/body-parser/lib/read.js:162:18<br> &nbsp; &nbsp;at AsyncResource.runInAsyncScope (node:async_hooks:203:9)<br> &nbsp; &nbsp;at invokeCallback (/mnt/c/Users/Administrator/OneDrive/Desktop/canteen/backend/node_modules/raw-body/index.js:238:16)<br> &nbsp; &nbsp;at done (/mnt/c/Users/Administrator/OneDrive/Desktop/canteen/backend/node_modules/raw-body/index.js:227:7)<br> &nbsp; &nbsp;at IncomingMessage.onEnd (/mnt/c/Users/Administrator/OneDrive/Desktop/canteen/backend/node_modules/raw-body/index.js:287:7)<br> &nbsp; &nbsp;at IncomingMessage.emit (node:events:517:28)<br> &nbsp; &nbsp;at endReadableNT (node:internal/streams/readable:1400:12)<br> &nbsp; &nbsp;at process.processTicksAndRejections (node:internal/process/task_queues:82:21)</pre>
+</body>
+</html>
+
+testing 3- Compensation(DB recovery failure)
+sudo service postgresql stop
+[output]
+on booking from frontend not booking 
+
+Test 4- Multi-server testing(Two backend servers share same Redis & DB safely.)
+PORT=5000 node server.js
+PORT=5001 node server.js
+Now send booking request to both servers randomly and if no overselling its safe 
+True Load Balancer Simulation (Advanced)
+
+If you want to simulate a real load balancer:
+
+Install nginx:
+
+sudo apt install nginx
+
+Edit config:
+
+sudo nano /etc/nginx/sites-available/default
+
+Inside server {} block:
+
+location /bookings {
+    proxy_pass http://backend;
+}
+
+upstream backend {
+    server localhost:5000;
+    server localhost:5001;
+}
+
+Restart:
+
+sudo service nginx restart
+
+Now send requests to:
+
+http://localhost/bookings
+
+Nginx will randomly distribute between 5000 and 5001.
+
+How To Verify It’s Hitting Both Servers
+Add this inside your server.js:
+console.log(`Request handled by PORT ${process.env.PORT}`);
+When you run test, you should see logs alternating between:
+PORT 5000
+PORT 5001
+PORT 5000
+PORT 5001
+
+That proves distribution.
+
+
+Test 5-Redis Crash Scenario
+Goal:
+System behavior if Redis goes down.
+Stop Redis:
+sudo service redis-server stop
+Try booking.
+
+TEST 6 — DB & Redis Consistency Check
+After many bookings:
+Compare:
+Redis:
+redis-cli
+get slot:SLOT_ID:available
+DB:
+SELECT remaining_capacity FROM slots WHERE id='SLOT_ID';
+They must match.
+If mismatch → consistency bug.
