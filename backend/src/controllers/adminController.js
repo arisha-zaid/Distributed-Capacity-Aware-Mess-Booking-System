@@ -5,16 +5,16 @@ const redis = require("../config/redis");
 // CREATE SLOT
 exports.createSlot = async (req, res) => {
   console.log("Create Slot Hit - New Code Active");
-  const { date, start_time, end_time, capacity } = req.body;
+  const { date, start_time, end_time, capacity, meal_type } = req.body;
 
   try {
     const numCapacity = parseInt(capacity);
     const result = await pool.query(
       `INSERT INTO slots 
-      (date, start_time, end_time, total_capacity, remaining_capacity, status)
-      VALUES ($1,$2,$3,$4,$4,'OPEN')
+      (date, start_time, end_time, total_capacity, remaining_capacity, status, meal_type)
+      VALUES ($1,$2,$3,$4,$4,'OPEN',$5)
       RETURNING *`,
-      [date, start_time, end_time, numCapacity]
+      [date, start_time, end_time, numCapacity, meal_type]
     );
 
     const slot = result.rows[0];
@@ -53,6 +53,7 @@ exports.updateCapacity = async (req, res) => {
 
     const currentCapacity = slot.rows[0].total_capacity;
     const remainingCapacity = slot.rows[0].remaining_capacity;
+    const status = slot.rows[0].status;
 
     const booked = currentCapacity - remainingCapacity;
 
@@ -68,9 +69,10 @@ exports.updateCapacity = async (req, res) => {
       `UPDATE slots
        SET total_capacity=$1,
            remaining_capacity=$2
+           status=$3
        WHERE id=$3
        RETURNING *`,
-      [capacity, newRemaining, slotId]
+      [capacity, newRemaining, status, slotId]
     );
 
     const updatedSlot = updated.rows[0];
