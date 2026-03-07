@@ -8,6 +8,16 @@ exports.createSlot = async (req, res) => {
   const { date, start_time, end_time, capacity, meal_type } = req.body;
 
   try {
+   // Prevent backdated slots
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // normalize to midnight
+
+    const slotDate = new Date(date);
+    if (slotDate < today) {
+      return res.status(400).json({ error: "Cannot create slots for past dates" });
+    }
+
+    //Insert in postgresql
     const numCapacity = parseInt(capacity);
     const result = await pool.query(
       `INSERT INTO slots 
@@ -32,7 +42,28 @@ exports.createSlot = async (req, res) => {
   }
 };
 
+// GET ALL SLOTS
+exports.getAllSlots = async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        *,
+        (total_capacity - remaining_capacity) AS booked,
+        CASE 
+          WHEN total_capacity = 0 THEN 0
+          ELSE ROUND(((total_capacity - remaining_capacity)::decimal / total_capacity) * 100)
+        END AS fill_percentage
+      FROM slots 
+      ORDER BY date ASC, start_time ASC
+    `);
 
+    res.json(result.rows);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch slots" });
+  }
+};
 
 // UPDATE CAPACITY
 exports.updateCapacity = async (req, res) => {
@@ -68,9 +99,9 @@ exports.updateCapacity = async (req, res) => {
     const updated = await pool.query(
       `UPDATE slots
        SET total_capacity=$1,
-           remaining_capacity=$2
+           remaining_capacity=$2,
            status=$3
-       WHERE id=$3
+       WHERE id=$4
        RETURNING *`,
       [capacity, newRemaining, status, slotId]
     );
@@ -91,7 +122,6 @@ exports.updateCapacity = async (req, res) => {
 };
 
 
-
 // FORCE CLOSE SLOT
 exports.closeSlot = async (req, res) => {
   const { slotId } = req.params;
@@ -110,10 +140,25 @@ exports.closeSlot = async (req, res) => {
       return res.status(404).json({ message: "Slot not found" });
     }
 
-    const closedSlot = result.rows[0];
-
     // Sync to Redis (set available to 0)
-    await redis.set(`slot:${closedSlot.id}:available`, 0);
+    await redis.set(`slot:${slotId}:available`, 0);
+
+    // Get the updated slot with computed fields
+    const updatedResult = await pool.query(`
+      SELECT
+        s.*,
+        COALESCE(b.booked_count, 0) AS booked,
+        ROUND((COALESCE(b.booked_count, 0)::numeric / NULLIF(s.total_capacity, 0)) * 100) AS fill_percentage
+      FROM slots s
+      LEFT JOIN (
+        SELECT slot_id, COUNT(*) AS booked_count
+        FROM bookings
+        GROUP BY slot_id
+      ) b ON s.id = b.slot_id
+      WHERE s.id = $1
+    `, [slotId]);
+
+    const closedSlot = updatedResult.rows[0];
 
     res.json({
       message: "Slot closed successfully",
@@ -132,10 +177,13 @@ exports.getBookingsPerDay = async (req, res) => {
   try {
 
     const result = await pool.query(`
-      SELECT date, COUNT(*) AS total_bookings
+      SELECT 
+        DATE(created_at) as day,
+        COUNT(*) as bookings
       FROM bookings
-      GROUP BY date
-      ORDER BY date DESC
+      WHERE status = 'booked'
+      GROUP BY day
+      ORDER BY day ASC
     `);
 
     res.json(result.rows);

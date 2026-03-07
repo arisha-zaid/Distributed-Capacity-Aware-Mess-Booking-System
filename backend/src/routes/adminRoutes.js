@@ -14,6 +14,10 @@ router.post(
   adminController.createSlot
 );
 
+// GET ALL SLOTS FOR ADMIN TABLE
+router.get("/slots", 
+  adminController.getAllSlots
+);
 
 // UPDATE CAPACITY
 router.put(
