@@ -45,4 +45,9 @@ router.get(
   adminController.getSlotUtilization
 );
 
+router.get("/analytics", 
+  adminController.getBookingsAnalytics
+);
+
+
 module.exports = router;

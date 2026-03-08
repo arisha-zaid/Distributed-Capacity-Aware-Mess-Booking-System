@@ -14,7 +14,25 @@ exports.createSlot = async (req, res) => {
 
     const slotDate = new Date(date);
     if (slotDate < today) {
-      return res.status(400).json({ error: "Cannot create slots for past dates" });
+      return res.status(400).json({ 
+        success: false, 
+        message: "Cannot create slots for past dates" 
+      });
+    }
+
+     // check overlap
+    const clashCheck = await pool.query(
+      `SELECT * FROM slots
+       WHERE date = $1
+       AND ($2 < end_time AND $3 > start_time)`,
+      [date, start_time, end_time]
+    );
+
+    if (clashCheck.rows.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Slot timing conflicts with existing slot"
+      });
     }
 
     //Insert in postgresql
@@ -33,12 +51,16 @@ exports.createSlot = async (req, res) => {
     await redis.set(`slot:${slot.id}:available`, slot.remaining_capacity);
 
     res.status(201).json({
+      success: true,
       message: "Slot created successfully",
-      slot: slot,
+      data: slot,
     });
 
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ 
+      success: false, 
+      message: err.message 
+    });
   }
 };
 
@@ -57,11 +79,18 @@ exports.getAllSlots = async (req, res) => {
       ORDER BY date ASC, start_time ASC
     `);
 
-    res.json(result.rows);
+    res.json({
+      success: true,
+      message: "Slots fetched successfully",
+      data: result.rows
+    });
 
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to fetch slots" });
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to fetch slots" 
+    });
   }
 };
 
@@ -79,7 +108,10 @@ exports.updateCapacity = async (req, res) => {
     );
 
     if (slot.rows.length === 0) {
-      return res.status(404).json({ message: "Slot not found" });
+      return res.status(404).json({ 
+        success: false, 
+        message: "Slot not found" 
+      });
     }
 
     const currentCapacity = slot.rows[0].total_capacity;
@@ -90,6 +122,7 @@ exports.updateCapacity = async (req, res) => {
 
     if (capacity < booked) {
       return res.status(400).json({
+        success: false,
         message: "New capacity cannot be less than already booked seats",
       });
     }
@@ -112,12 +145,16 @@ exports.updateCapacity = async (req, res) => {
     await redis.set(`slot:${updatedSlot.id}:available`, updatedSlot.remaining_capacity);
 
     res.json({
-      message: "Capacity updated",
-      slot: updatedSlot,
+      success: true,
+      message: "Capacity updated successfully",
+      data: updatedSlot,
     });
 
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ 
+      success: false, 
+      message: err.message 
+    });
   }
 };
 
@@ -137,7 +174,10 @@ exports.closeSlot = async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ message: "Slot not found" });
+      return res.status(404).json({ 
+        success: false, 
+        message: "Slot not found" 
+      });
     }
 
     // Sync to Redis (set available to 0)
@@ -161,12 +201,16 @@ exports.closeSlot = async (req, res) => {
     const closedSlot = updatedResult.rows[0];
 
     res.json({
+      success: true,
       message: "Slot closed successfully",
-      slot: closedSlot,
+      data: closedSlot,
     });
 
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ 
+      success: false, 
+      message: err.message 
+    });
   }
 };
 
@@ -186,13 +230,19 @@ exports.getBookingsPerDay = async (req, res) => {
       ORDER BY day ASC
     `);
 
-    res.json(result.rows);
+    res.json({
+      success: true,
+      message: "Bookings per day fetched successfully",
+      data: result.rows
+    });
 
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ 
+      success: false, 
+      message: err.message 
+    });
   }
 };
-
 
 
 // SLOT UTILIZATION ANALYTICS
@@ -217,9 +267,54 @@ exports.getSlotUtilization = async (req, res) => {
       ORDER BY date DESC
     `);
 
-    res.json(result.rows);
+    res.json({
+      success: true,
+      message: "Slot utilization fetched successfully",
+      data: result.rows
+    });
 
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ 
+      success: false, 
+      message: err.message 
+    });
+  }
+};
+
+
+//SlOT GRAPH ANALYTICS
+exports.getBookingsAnalytics = async (req, res) => {
+  try {
+
+    const totalBookings = await pool.query(
+      "SELECT COUNT(*) FROM bookings"
+    );
+
+    const todayBookings = await pool.query(
+      "SELECT COUNT(*) FROM bookings WHERE DATE(created_at) = CURRENT_DATE"
+    );
+
+    const slotWise = await pool.query(`
+      SELECT slots.start_time, COUNT(bookings.id) as total
+      FROM bookings
+      JOIN slots ON bookings.slot_id = slots.id
+      GROUP BY slots.start_time
+    `);
+
+    res.json({
+      success: true,
+      message: "Analytics fetched successfully",
+      data: {
+        totalBookings: totalBookings.rows[0].count,
+        todayBookings: todayBookings.rows[0].count,
+        slotWise: slotWise.rows
+      }
+    });
+
+  } catch (err) {
+    res.status(500).json({ 
+      success: false, 
+      message: err.message 
+    });
   }
 };

@@ -31,14 +31,21 @@ exports.bookSlot = async (req, res) => {
     );
 
     if (existing.rows.length > 0) {
-      return res.json(existing.rows[0]);
+      return res.json({
+        success: true,
+        message: "Booking already exists",
+        data: existing.rows[0]
+      });
     }
 
     // 2️ Redis atomic decrement
     const reserved = await redis.eval(reserveScript, 1, inventoryKey);
 
     if (reserved === 0) {
-      return res.status(400).json({ error: "Slot Full" });
+      return res.status(400).json({ 
+        success: false, 
+        message: "Slot Full" 
+      });
     }
 
     // 3️ Start DB transaction
@@ -60,7 +67,10 @@ const slotCheck = await client.query(
 if (slotCheck.rows.length === 0) {
   await client.query("ROLLBACK");
   await redis.incr(inventoryKey);
-  return res.status(404).json({ error: "Slot not found" });
+  return res.status(404).json({ 
+    success: false, 
+    message: "Slot not found" 
+  });
 }
 
 const slot = slotCheck.rows[0];
@@ -73,14 +83,20 @@ const now = new Date();
 if (now > slotEnd) {
   await client.query("ROLLBACK");
   await redis.incr(inventoryKey);
-  return res.status(400).json({ error: "Slot expired" });
+  return res.status(400).json({ 
+    success: false, 
+    message: "Slot expired" 
+  });
 }
 
 // booking blocked if slot closed/full
 if (slot.status === "CLOSED" || slot.status === "FULL") {
   await client.query("ROLLBACK");
   await redis.incr(inventoryKey);
-  return res.status(400).json({ error: "Slot not available" });
+  return res.status(400).json({ 
+    success: false, 
+    message: "Slot not available" 
+  });
 }
 
       // 5️ Insert booking
@@ -106,18 +122,28 @@ if (slot.status === "CLOSED" || slot.status === "FULL") {
 
       await client.query("COMMIT");
 
-      return res.json(booking.rows[0]);
+      return res.json({
+        success: true,
+        message: "Slot booked successfully",
+        data: booking.rows[0]
+      });
 
     } catch (dbError) {
       await client.query("ROLLBACK");
       await redis.incr(inventoryKey); // compensation
-      return res.status(500).json({ error: dbError.message });
+      return res.status(500).json({ 
+        success: false, 
+        message: dbError.message 
+      });
 
     } finally {
       client.release();
     }
 
   } catch (err) {
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ 
+      success: false, 
+      message: err.message 
+    });
   }
 };
