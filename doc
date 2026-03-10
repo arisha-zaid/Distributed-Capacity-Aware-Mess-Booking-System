@@ -55,3 +55,11 @@ sudo service postgresql start
 sudo service postgresql status
 sudo -i -u postgres 
 psql
+
+
+___________Protection & Security_______________________
+
+express-rate-limit is an open-source middleware for the Express.js framework that controls how frequently clients can make requests to a server. It helps developers prevent abuse, brute-force attempts, and denial-of-service (DoS) attacks by enforcing limits on request frequency. The library is widely used in production-grade Node.js APIs for security and performance protection.
+
+express-session
+bcrypt

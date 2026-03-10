@@ -19,6 +19,11 @@ router.get("/slots",
   adminController.getAllSlots
 );
 
+// FILTER SLOTS
+router.get("/slots/filter",
+  adminController.filterSlots
+);
+
 // UPDATE CAPACITY
 router.put(
   "/slots/:slotId/capacity",

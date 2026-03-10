@@ -64,6 +64,61 @@ exports.createSlot = async (req, res) => {
   }
 };
 
+
+// FILTER SLOTS
+exports.filterSlots = async (req, res) => {
+  const { date, meal_type, status } = req.query;
+
+  try {
+    let query = `
+      SELECT 
+        *,
+        (total_capacity - remaining_capacity) AS booked,
+        CASE 
+          WHEN total_capacity = 0 THEN 0
+          ELSE ROUND(((total_capacity - remaining_capacity)::decimal / total_capacity) * 100)
+        END AS fill_percentage
+      FROM slots 
+      WHERE 1=1
+    `;
+    const params = [];
+    let paramIndex = 1;
+
+    if (date) {
+      query += ` AND date = $${paramIndex++}`;
+      params.push(date);
+    }
+
+    if (meal_type && meal_type.toLowerCase() !== 'all') {
+      query += ` AND meal_type = $${paramIndex++}`;
+      params.push(meal_type.toUpperCase());
+    }
+
+    if (status && status.toLowerCase() !== 'all') {
+      query += ` AND status = $${paramIndex++}`;
+      params.push(status.toUpperCase());
+    }
+
+    query += ` ORDER BY date ASC, start_time ASC`;
+
+    const result = await pool.query(query, params);
+
+    res.json({
+      success: true,
+      message: "Filtered slots fetched successfully",
+      data: result.rows
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to filter slots" 
+    });
+  }
+};
+
+
 // GET ALL SLOTS
 exports.getAllSlots = async (req, res) => {
   try {
