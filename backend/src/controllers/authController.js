@@ -10,7 +10,7 @@ exports.register = async (req, res) => {
     const user = await pool.query(
       `INSERT INTO users(name,email,password,roll_no)
        VALUES($1,$2,$3,$4)
-       RETURNING id,name,email`,
+       RETURNING id,name,email,role`,
       [name, email, hashed, roll_no]
     );
 

@@ -2,31 +2,35 @@ const express = require("express");
 const router = express.Router();
 
 const adminController = require("../controllers/adminController");
-const adminMiddleware = require("../middleware/adminMiddleware");
+const requireAdmin = require("../middlewares/requireAdmin");
 
-router.get("/test", (req, res) => {
+router.get("/test", requireAdmin, (req, res) => {
   res.json({ message: "Admin route working" });
 });
 
 // CREATE SLOT
 router.post(
   "/slots",
+  requireAdmin,
   adminController.createSlot
 );
 
 // GET ALL SLOTS FOR ADMIN TABLE
-router.get("/slots", 
+router.get("/slots",
+  requireAdmin,
   adminController.getAllSlots
 );
 
 // FILTER SLOTS
 router.get("/slots/filter",
+  requireAdmin,
   adminController.filterSlots
 );
 
 // UPDATE CAPACITY
 router.put(
   "/slots/:slotId/capacity",
+  requireAdmin,
   adminController.updateCapacity
 );
 
@@ -34,6 +38,7 @@ router.put(
 // FORCE CLOSE SLOT
 router.put(
   "/slots/:slotId/close",
+  requireAdmin,
   adminController.closeSlot
 );
 
@@ -42,15 +47,18 @@ router.put(
 
 router.get(
   "/analytics/bookings-per-day",
+  requireAdmin,
   adminController.getBookingsPerDay
 );
 
 router.get(
   "/analytics/slot-utilization",
+  requireAdmin,
   adminController.getSlotUtilization
 );
 
-router.get("/analytics", 
+router.get("/analytics",
+  requireAdmin,
   adminController.getBookingsAnalytics
 );
 

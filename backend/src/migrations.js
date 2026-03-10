@@ -2,6 +2,11 @@ const pool = require("./config/db");
 
 async function createTables() {
   await pool.query(`
+    ALTER TABLE IF EXISTS users
+    ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'student';
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS slots (
       id SERIAL PRIMARY KEY,
       date DATE NOT NULL,
